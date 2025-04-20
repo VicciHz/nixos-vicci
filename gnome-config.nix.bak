@@ -1,0 +1,16 @@
+{ config, pkgs, lib, ... }:
+
+let
+  # Pink/Black theme settings
+  customGnomeSettings = builtins.toJSON {
+    "org/gnome/desktop/interface" = {
+      color-scheme = "prefer-dark";
+      gtk-theme = "Catppuccin-Mocha-Pink";
+      icon-theme = "Papirus-Dark";
+      cursor-theme = "Catppuccin-Mocha-Pink-Cursors";
+      font-name = "JetBrainsMono Nerd Font 11";
+      document-font-name = "JetBrainsMono Nerd Font 11";
+      monospace-font-name = "JetBrainsMono Nerd Font Mono 11";
+    };
+    
+    

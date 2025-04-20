@@ -1,0 +1,140 @@
+{ config, pkgs, lib, ... }:
+
+let
+  colors = {
+    bg = "0x1E1E2E";
+    fg = "0xCDD6F4";
+    pink = "0xF5C2E7";
+    mauve = "0xCBA6F7";
+    red = "0xF38BA8";
+    maroon = "0xEBA0AC";
+    peach = "0xFAB387";
+    green = "0xA6E3A1";
+    blue = "0x89B4FA";
+    black = "0x11111B";
+  };
+
+  waybar = pkgs.waybar.override {
+    hyprlandSupport = true;  # Corrected parameter
+    pulseSupport = true;
+  };
+
+  wallpaperScript = pkgs.writeShellScriptBin "set-wallpaper" ''
+    WALLPAPER="$HOME/.config/hypr/wallpaper.jpg"
+    
+    if ! ${pkgs.procps}/bin/pgrep swww; then
+      ${pkgs.swww}/bin/swww init
+      sleep 1
+    fi
+
+    if [ -f "$WALLPAPER" ]; then
+      ${pkgs.swww}/bin/swww img "$WALLPAPER" --transition-type center
+    else
+      ${pkgs.curl}/bin/curl -L "https://images.pexels.com/photos/3075993/pexels-photo-3075993.jpeg" -o "$WALLPAPER" || {
+        echo "Failed to download wallpaper" >&2
+        exit 1
+      }
+      ${pkgs.swww}/bin/swww img "$WALLPAPER" --transition-type center
+    fi
+  '';
+
+  hyprlandConf = pkgs.writeText "hyprland.conf" ''
+    monitor=,preferred,auto,1
+    
+    exec-once = ${wallpaperScript}/bin/set-wallpaper
+    exec-once = ${waybar}/bin/waybar
+    exec-once = ${pkgs.dunst}/bin/dunst
+
+    source = ~/.config/hypr/env.conf
+
+    $terminal = ${pkgs.kitty}/bin/kitty
+    $fileManager = ${pkgs.nautilus}/bin/nautilus
+    $menu = ${pkgs.rofi-wayland}/bin/rofi -show drun
+
+    input {
+      kb_layout = se
+      follow_mouse = 1
+      touchpad.natural_scroll = false
+    }
+
+    general {
+      gaps_in = 5
+      gaps_out = 10
+      border_size = 2
+      col.active_border = rgba(${colors.pink}ff) rgba(${colors.mauve}ff) 45deg
+      layout = dwindle
+    }
+
+    decoration {
+      rounding = 10
+      blur {
+        enabled = true
+        size = 3
+        passes = 2
+      }
+      drop_shadow = true
+      shadow_range = 15
+    }
+
+    animations {
+      enabled = true
+      bezier = myBezier, 0.05, 0.9, 0.1, 1.05
+      animation = windows, 1, 7, myBezier
+    }
+
+    windowrule = opacity 0.95 override,^(kitty)$
+
+    $mainMod = SUPER
+    bind = $mainMod, Q, exec, $terminal
+    bind = $mainMod, C, killactive
+    bind = $mainMod, E, exec, $fileManager
+    bind = $mainMod, R, exec, $menu
+    bind = $mainMod, V, togglefloating
+    bind = $mainMod, 1, workspace, 1
+    bindm = $mainMod, mouse:272, movewindow
+  '';
+
+in {
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
+    extraPackages = with pkgs; [ vaapiVdpau ];
+  };
+
+  xdg.portal = {
+    enable = true;
+    extraPortals = [ pkgs.xdg-desktop-portal-hyprland ];
+  };
+
+  fonts.packages = with pkgs; [
+    (nerdfonts.override { fonts = [ "JetBrainsMono" ]; })
+  ];
+
+  environment.systemPackages = with pkgs; [
+    hyprland
+    waybar
+    swww
+    rofi-wayland
+    dunst
+    kitty
+    wallpaperScript
+    firefox
+  ];
+
+  system.activationScripts.hyprlandSetup = ''
+    mkdir -p /home/vicci/.config/hypr
+    cp ${hyprlandConf} /home/vicci/.config/hypr/hyprland.conf
+    
+    cat > /home/vicci/.config/hypr/env.conf << EOF
+    env = LIBVA_DRIVER_NAME,nvidia
+    env = GBM_BACKEND,nvidia-drm
+    env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+    env = WLR_NO_HARDWARE_CURSORS,1
+    EOF
+
+    chown -R vicci:users /home/vicci/.config
+  '';
+
+  programs.hyprland.enable = true;
+}
+
